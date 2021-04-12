@@ -1,0 +1,511 @@
+#define MAX_PACKET_SIZE		65535
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+#include <iostream>
+#include <cmath>
+#include <SFML/Graphics.hpp>
+#include <windows.h>
+#include <thread>
+#pragma comment(lib, "ws2_32.lib")
+#pragma warning(disable: 4996)
+#include <winsock2.h>
+
+using namespace sf;
+
+SOCKET newConnection;
+SOCKET Connection;
+
+
+class Bear {
+
+	float Mass;
+	CircleShape Pooh;
+	float x;
+	float y;
+	float r;
+
+public:
+	Bear(float m, float X, float Y, float R) {
+		Mass = m;
+		x = X;
+		y = Y;
+		r = R;
+
+		Pooh.setFillColor(Color(139, 69, 19));
+
+		Pooh.setOutlineThickness(5.f);
+		Pooh.setOutlineColor(Color::Black);
+	}
+
+	float GetMass() {
+		return Mass;
+	}
+
+	CircleShape Getpooh() {
+		return Pooh;
+	}
+
+	void Movement(float dx, float dy) {
+		x = x + dx;
+		y = y - dy;
+
+		if (y > 665) {
+			y = 665;
+		}
+	}
+
+	float GetX() {
+		return x;
+	}
+	float GetY() {
+		return y;
+	}
+
+	void draw(RenderWindow& window) {
+		Pooh.setRadius(r);
+		Pooh.setPosition(x, y);
+		window.draw(Pooh);
+	}
+
+	float GetR() {
+		return r;
+	}
+
+	float Eating(float mh, float x, float y) {
+
+		if ((x >= 805 && x <= 808) && (y >= 204 && y <= 206)) {
+
+			if (mh >= 0.1) {
+
+				Mass = Mass + 0.1;
+				mh = mh - 0.1;
+
+				r = r + 0.1;
+			}
+
+		}
+
+		return mh;
+	}
+
+};
+
+class Engine {
+	float F;
+	float MaxF;
+	float MinF;
+public:
+	Engine(float min, float max, float f)
+	{
+		F = f;
+		MinF = min;
+		MaxF = max;
+	}
+
+	void SetF(float percent)
+	{
+		F = percent * (MaxF / 100.);
+	}
+
+	float GetF()
+	{
+		return F;
+	}
+
+	float GetMaxF()
+	{
+		return MaxF;
+	}
+
+	float GetMinF()
+	{
+		return MinF;
+	}
+};
+
+class PID {
+	float Pk;
+	float Ik;
+	float Dk;
+	float dT;
+
+	float P = 0, I = 0, D = 0, out = 0, err = 0, prevErr = 0;
+
+public:
+	PID(float pk, float ik, float dk, float dt)
+	{
+		Pk = pk;
+		Ik = ik;
+		Dk = dk;
+		dT = dt;
+	}
+	float Change(float input, float setpoint) {
+		P = setpoint - input;
+		I = I + (setpoint - input) * dT;
+		err = setpoint - input;
+		D = (err - prevErr) / dT;
+		prevErr = err;
+
+		out = Pk * P + Ik * I + Dk * D;
+		if (out > 100)
+		{
+			return 100;
+		}
+		else if (out < -100)
+		{
+			return -100;
+		}
+		else
+		{
+			return out;
+		}
+	}
+};
+
+class ControlS {
+
+	float Height;
+	float DH;
+	float Acceleration;
+	float AccelerationD;
+	float Distance;
+	float DD;
+
+public:
+	ControlS(float dh, float h, float a, float dd, float d, float ad) {
+		DH = dh;
+		Acceleration = a;
+		Height = h;
+		DD = dd;
+		AccelerationD = ad;
+		Distance = d;
+
+	}
+
+	float GetAcc() {
+		return Acceleration;
+	}
+	void SetAcc(float  F, float m)
+	{
+		Acceleration = F / m;
+	}
+
+	float GetDH() {
+		return DH;
+	}
+	void SetDH(float a, float dt, float g)
+	{
+		DH = a * dt - (g * pow(dt, 2)) / 2;
+	}
+
+	float GetHei() {
+		return Height;
+	}
+
+	float GetAccD() {
+		return AccelerationD;
+	}
+
+	float GetDD() {
+		return DD;
+	}
+
+	float GetDis() {
+		return Distance;
+	}
+
+	void SetAccD(float  F, float m) {
+		AccelerationD = F / m;
+	}
+
+	void SetDD(float a, float dt)
+	{
+		DD = a * dt;
+	}
+
+	void SetDis(float a, float dt)
+	{
+		Distance = Distance + a * dt;
+	
+	}
+
+	void SetHei(float a, float dt, float g)
+	{
+		Height = Height + a * dt - (g * pow(dt, 2)) / 2;
+		if (Height < 335) {
+			Height = 335;
+		}
+	}
+
+	void Fly(float g, float M, float GF) {
+
+		SetAcc(GF, M);
+		SetHei(GetAcc(), 0.1, g);
+		SetDH(GetAcc(), 0.1, g);
+	}
+
+	void Sides(float M, float GF) {
+		SetAccD(GF, M);
+		SetDis(GetAccD(), 0.1);
+		SetDD(GetAccD(), 0.1);
+	}
+
+};
+
+class World {
+
+	RectangleShape tree;
+	RectangleShape land;
+	CircleShape hole;
+	CircleShape leaves;
+	RectangleShape sky;
+	float honeymass;
+
+public:
+	World(float HM) {
+		land.setSize(Vector2f(1000, 80));
+		land.setPosition(0, 720);
+		land.setFillColor(Color::Green);
+
+		tree.setSize(Vector2f(80, 600));
+		tree.setPosition(800, 120);
+		tree.setFillColor(Color(74, 48, 12));
+
+		hole.setRadius(30.f);
+		hole.setPosition(800, 200);
+		hole.setFillColor(Color::Black);
+
+		sky.setSize(Vector2f(1000, 1000));
+		sky.setPosition(0, 0);
+		sky.setFillColor(Color::Blue);
+
+		leaves.setRadius(65.f);
+		leaves.setPosition(775, 60);
+		leaves.setFillColor(Color(0, 100, 0));
+
+		honeymass = HM;
+	}
+
+	RectangleShape Getsky() {
+		return sky;
+	}
+	RectangleShape Gettree() {
+		return tree;
+	}
+	RectangleShape Getland() {
+		return land;
+	}
+	CircleShape Gethole() {
+		return hole;
+	}
+
+	CircleShape Getleaves() {
+		return leaves;
+	}
+
+	float Gethm() {
+		return honeymass;
+	}
+
+	void Sethm(float hm) {
+		honeymass = hm;
+	}
+
+};
+
+void KP() {
+
+	char k;
+	while (true) {
+		Sleep(50);
+		std::cout << "Введите действие " << std::endl;
+		std::cin >> k;
+		send(newConnection, &k, sizeof(k), NULL);
+	}
+}
+
+int Server() {
+
+	WSAData wsaData;
+	WORD DLLVersion = MAKEWORD(2, 1);
+	if (WSAStartup(DLLVersion, &wsaData) != 0) {
+		std::cout << "Error" << std::endl;
+		exit(1);
+	}
+
+	SOCKADDR_IN addr;
+	int sizeofaddr = sizeof(addr);
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	addr.sin_port = htons(1111);
+	addr.sin_family = AF_INET;
+
+	SOCKET slisten = socket(AF_INET, SOCK_STREAM, NULL);
+	bind(slisten, (SOCKADDR*)& addr, sizeof(addr));
+	listen(slisten, SOMAXCONN);
+
+	newConnection;
+	newConnection = accept(slisten, (SOCKADDR*)& addr, &sizeofaddr);
+
+	if (newConnection == 0) {
+		std::cout << "Error 2\n";
+	}
+	else {
+		std::cout << "Client connection\n";
+	}
+
+	BOOL l = TRUE;
+	if (SOCKET_ERROR == ioctlsocket(newConnection, FIONBIO, (unsigned long*)& l))
+	{
+		// Error
+		int res = WSAGetLastError();
+		return -1;
+	}
+
+	Sleep(50);
+
+}
+
+int Klient() {
+
+	WSAData wsaData;
+	WORD DLLVersion = MAKEWORD(2, 1);
+	if (WSAStartup(DLLVersion, &wsaData) != 0) {
+		std::cout << "Error" << std::endl;
+		exit(1);
+	}
+
+	SOCKADDR_IN addr;
+	int sizeofaddr = sizeof(addr);
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	addr.sin_port = htons(1111);
+	addr.sin_family = AF_INET;
+
+	Connection = socket(AF_INET, SOCK_STREAM, NULL);
+	//connect(Connection, (SOCKADDR*)& addr, sizeof(addr));
+
+	if (connect(Connection, (SOCKADDR*)& addr, sizeof(addr)) != 0) {
+		std::cout << "Error: fcts.\n" << std::endl;
+		return 1;
+	}
+
+	std::cout << "Connected TS\n" << std::endl;
+
+	CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)KP, NULL, NULL, NULL);
+
+}
+
+int main() {
+
+	setlocale(LC_ALL, "Russian");
+
+	const float g = 9.8;
+	char K1;
+
+	PID PiD(0.7, 0.02, 0.0012, 1);
+	PID PiD1(0.5, 0.0002, 0.0012, 1);
+	PID PiDD(0.4, 0.00002, 0.12, 1);
+	Bear pooh(10, 20, 665, 25);
+	Engine e(0, 500, 0);
+	ControlS Cs(0, 335, 0, 0, 20, 0);
+	World world(5);
+
+	std::thread th(Klient);
+	Server();
+
+	RenderWindow window(VideoMode(1000, 800), "Pooh");
+
+	// Главный цикл приложения: выполняется, пока открыто окно
+	while (window.isOpen())
+	{
+		Event event;
+		while (window.pollEvent(event))
+		{
+
+			if (event.type == Event::Closed)
+				window.close();
+		}
+
+		/*std::cout << "Значение высоты равно" << Cs.GetHei() << std::endl;
+		std::cout << "Значение тяги равно равно" << e.GetF() << std::endl;
+		std::cout << "Значение ускорения равно" << Cs.GetAcc() << std::endl;
+		std::cout << "Значение dh равно" << Cs.GetDH() << std::endl;
+		std::cout << "Значение массы меда равно" << world.Gethm() << std::endl;
+		std::cout << "Значение массы пуха равно" << pooh.GetMass() << '\n' << std::endl;
+
+		std::cout << "Значение x равно" << pooh.GetX() << std::endl;
+		std::cout << "Значение y равно" << pooh.GetY() << '\n' << std::endl;*/
+		
+		//int len = 0;
+		recv(Connection, &K1, MAX_PACKET_SIZE, 0);
+
+		/*if (len == 1)
+			std::cout << K1 << std::endl;*/
+
+		switch (K1) {
+		case 102:
+
+			window.draw(world.Getsky());
+			window.draw(world.Getland());
+			window.draw(world.Gettree());
+			window.draw(world.Getleaves());
+			window.draw(world.Gethole());
+
+			e.SetF(PiD.Change(Cs.GetHei(), 795));
+			Cs.Fly(g, pooh.GetMass(), e.GetF());
+
+			e.SetF(PiDD.Change(Cs.GetDis(), 803));
+			Cs.Sides(pooh.GetMass(), e.GetF());
+
+			pooh.Movement(Cs.GetDD(), Cs.GetDH());
+			pooh.draw(window);
+
+			world.Sethm(pooh.Eating(world.Gethm(), pooh.GetX(), pooh.GetY()));
+
+			window.display();
+
+			Sleep(10);
+			std::cout << "Значение тяги равно равно" << e.GetF() << std::endl;
+			std::cout << "Значение высоты равно" << Cs.GetHei() << std::endl;
+			std::cout << "Значение x равно" << pooh.GetX() << std::endl;
+			std::cout << "Значение y равно" << pooh.GetY() << '\n' << std::endl;
+
+			break;
+
+		case 108:
+
+			window.draw(world.Getsky());
+			window.draw(world.Getland());
+			window.draw(world.Gettree());
+			window.draw(world.Getleaves());
+			window.draw(world.Gethole());
+
+			e.SetF(PiD1.Change(Cs.GetHei(), 335));
+			Cs.Fly(g, pooh.GetMass(), e.GetF());
+
+			e.SetF(PiDD.Change(Cs.GetDis(), 20));
+			Cs.Sides(pooh.GetMass(), e.GetF());
+
+			pooh.Movement(Cs.GetDD(), Cs.GetDH());
+			pooh.draw(window);
+
+			world.Sethm(pooh.Eating(world.Gethm(), pooh.GetX(), pooh.GetY()));
+
+			window.display();
+
+			Sleep(10);
+			std::cout << "Значение тяги равно равно" << e.GetF() << std::endl;
+			std::cout << "Значение высоты равно" << Cs.GetHei() << std::endl;
+			std::cout << "Значение x равно" << pooh.GetX() << std::endl;
+			std::cout << "Значение y равно" << pooh.GetY() << '\n' << std::endl;
+
+			break;
+
+		}
+
+
+	}
+
+	return 0;
+}
