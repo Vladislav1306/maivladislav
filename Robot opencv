@@ -25,14 +25,14 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	namedWindow("Display", CV_WINDOW_AUTOSIZE);
+	//namedWindow("Display", CV_WINDOW_AUTOSIZE);
 
 	double dWidth = cap.get(CV_CAP_PROP_FRAME_WIDTH);
 	double dHeight = cap.get(CV_CAP_PROP_FRAME_HEIGHT);
 
 	Size frameSize(static_cast<int>(dWidth), static_cast<int>(dHeight));
 
-	VideoWriter oVideoWriter("robot.avi", CV_FOURCC('M', 'J', 'P', 'G'), 20, frameSize);
+	VideoWriter oVideoWriter("robot.avi", CV_FOURCC('F', 'L', 'V', '1'), 24, frameSize);
 
 	if (!oVideoWriter.isOpened())
 	{
@@ -43,6 +43,13 @@ int main(int argc, char** argv)
 	while (true)
 	{
 		Mat frame;
+		Mat gray_image;
+		Mat edge;
+		Mat filter;
+		Mat size;
+
+		vector<Vec4i> lines;
+		int i = 0;
 
 		bool bSuccess = cap.read(frame); // read a new frame from video
 
@@ -52,21 +59,41 @@ int main(int argc, char** argv)
 			break;
 		}
 
-		Mat gray_image;
-		Mat edge;
-		Mat filter;
 		cvtColor(frame, gray_image, COLOR_BGR2GRAY);
 		GaussianBlur(gray_image, filter, Size(7, 7), 1.5);
 		Canny(filter, edge, 50, 150, 3);
+		//HoughLinesP(edge, lines, 1, CV_PI / 180, 50, 10, 250);
 
-		oVideoWriter.write(edge); //writer the frame into the file
+		//// нарисуем найденные линии
+		//for (size_t i = 0; i < lines.size(); i++) {
+		//	Vec4i l = lines[i];
+		//	line(frame, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(255, 0, 0), 3, LINE_AA);
+		//}
 
-		imshow("Display", edge);
+		vector<vector<Point> > contours;
+		findContours(edge, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
 
-		if (waitKey(10) == 27)
+		for (size_t i = 0; i < contours.size(); i++)
 		{
-			cout << "esc key is pressed by user" << endl;
-			break;
+			Rect minRect = boundingRect(contours[i]);
+
+			if (minRect.width > 50 & minRect.height > 50)
+			{
+				rectangle(frame, minRect, Scalar(0, 0, 255));
+				putText(frame, format("width = %d , height = %d", minRect.width, minRect.height), Point(minRect.x, minRect.y),
+					FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
+				cout << "width: " << minRect.width << " ";
+				cout << "height: " << minRect.height << "\n";
+			}
 		}
+			oVideoWriter.write(frame); //writer the frame into the file
+		
+			imshow("Display", frame);
+
+			if (waitKey(1) == 27)
+			{
+				cout << "esc key is pressed by user" << endl;
+				break;
+			}
 	}
 }
