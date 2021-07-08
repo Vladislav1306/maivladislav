@@ -18,6 +18,12 @@ int main(int argc, char** argv)
 {
 	Mat capture;
 	VideoCapture cap(0);
+
+	int RCMX = 0;
+	int RCMY = 0;
+	int rectcentreX = 0;
+	int rectcentreY = 0;
+
 	if (!cap.isOpened())
 	{
 		cout << "Cannot connect to camera" << endl;
@@ -48,8 +54,8 @@ int main(int argc, char** argv)
 		Mat filter;
 		Mat size;
 
-		vector<Vec4i> lines;
-		int i = 0;
+		/*vector<Vec4i> lines;
+		int i = 0;*/
 
 		bool bSuccess = cap.read(frame); // read a new frame from video
 
@@ -77,14 +83,38 @@ int main(int argc, char** argv)
 		{
 			Rect minRect = boundingRect(contours[i]);
 
-			if (minRect.width > 50 & minRect.height > 50)
+			RCMX = rectcentreX;
+			RCMY = rectcentreY;
+
+			if (minRect.width > 50 & minRect.height > 50 & minRect.width < 600 & minRect.height < 600)
 			{
+				rectcentreX = minRect.x + minRect.width / 2;
+				rectcentreY = minRect.y + minRect.height / 2;
+				int distance = norm(Point(RCMX, RCMY) - Point(rectcentreX, rectcentreY));
+				int CLX = abs((rectcentreX - RCMX) / 2);
+				if (rectcentreX > RCMX)
+					CLX = RCMX + CLX;
+				else
+					CLX = rectcentreX + CLX;
+				int CLY = abs((rectcentreY - RCMY) / 2);
+				if (rectcentreY > RCMY)
+					CLY = RCMY + CLY;
+				else
+					CLY = rectcentreY + CLY;
 				rectangle(frame, minRect, Scalar(0, 0, 255));
+				circle(frame, Point(rectcentreX, rectcentreY), 1, (0, 0, 255), 3);
+				if (i > 0) {
+					line(frame, Point(RCMX, RCMY), Point(rectcentreX, rectcentreY), Scalar(0, 0, 255));
+					putText(frame, format("D = %d", distance), Point(CLX, CLY),
+						FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
+				}
 				putText(frame, format("width = %d , height = %d", minRect.width, minRect.height), Point(minRect.x, minRect.y),
 					FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
-				cout << "width: " << minRect.width << " ";
-				cout << "height: " << minRect.height << "\n";
+				/*cout << "width: " << minRect.width << " ";
+				cout << "height: " << minRect.height << "\n";*/
 			}
+
+
 		}
 			oVideoWriter.write(frame); //writer the frame into the file
 		
