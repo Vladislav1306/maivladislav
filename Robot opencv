@@ -9,20 +9,31 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 #define default_buflen 1024
+#define default_port "1234"
 
 using namespace std;
 using namespace cv;
 
-#define default_port "1234"
-int main(int argc, char** argv)
-{
-	Mat capture;
-	VideoCapture cap(0);
+Size GetSize(VideoCapture &cap) {
 
-	int RCMX = 0;
-	int RCMY = 0;
-	int rectcentreX = 0;
-	int rectcentreY = 0;
+	double dWidth = cap.get(CV_CAP_PROP_FRAME_WIDTH);
+	double dHeight = cap.get(CV_CAP_PROP_FRAME_HEIGHT);
+
+	Size frameSize(static_cast<int>(dWidth), static_cast<int>(dHeight));
+
+	return frameSize;
+}
+
+Mat Filter(Mat &frame, Mat &edge, Mat &filter, Mat &gray_image) {
+
+	cvtColor(frame, gray_image, COLOR_BGR2GRAY);
+	GaussianBlur(gray_image, filter, Size(7, 7), 1.5);
+	Canny(filter, edge, 50, 150, 3);
+
+	return edge;
+}
+
+int Error1(VideoCapture &cap, VideoWriter & oVideoWriter){
 
 	if (!cap.isOpened())
 	{
@@ -31,99 +42,170 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	//namedWindow("Display", CV_WINDOW_AUTOSIZE);
-
-	double dWidth = cap.get(CV_CAP_PROP_FRAME_WIDTH);
-	double dHeight = cap.get(CV_CAP_PROP_FRAME_HEIGHT);
-
-	Size frameSize(static_cast<int>(dWidth), static_cast<int>(dHeight));
-
-	VideoWriter oVideoWriter("robot.avi", CV_FOURCC('F', 'L', 'V', '1'), 24, frameSize);
-
 	if (!oVideoWriter.isOpened())
 	{
 		cout << "ERROR: Failed to write the video" << endl;
 		return -1;
 	}
+}
+
+int Error2(VideoCapture& cap, Mat& frame) {
+
+	bool bSuccess = cap.read(frame);
+
+	if (!bSuccess)
+	{
+		cout << "ERROR: Cannot read a frame from video file" << endl;
+		return -1;
+	}
+}
+
+class Line {
+	int RCMx, RCMy, CLx, CLy, rectcentrey, rectcentrex, Distance;
+public:
+	Line(int RCMX, int RCMY, int CLX, int CLY, int rectcentreY, int rectcentreX, int distance) {
+
+		RCMx = RCMX;
+		RCMy = RCMY;
+		CLx = CLX;
+		CLy = CLY;
+		rectcentrey = rectcentreY;
+		rectcentrex = rectcentreX;
+		Distance = distance;
+
+	}
+
+	int RectCentre(Rect &minRect) {
+
+		rectcentrex = minRect.x + minRect.width / 2;
+		rectcentrey = minRect.y + minRect.height / 2;
+
+		return rectcentrey;
+		return rectcentrex;
+	}
+
+	int Dist() {
+
+		Distance = norm(Point(RCMx, RCMy) - Point(rectcentrex, rectcentrey));
+
+		return Distance;
+	}
+
+	int CentreLine() {
+
+		CLx = abs((rectcentrex - RCMx) / 2);
+		if (rectcentrex > RCMx)
+			CLx = RCMx + CLx;
+		else
+			CLx = rectcentrex + CLx;
+		CLy = abs((rectcentrey - RCMy) / 2);
+		if (rectcentrey > RCMy)
+			CLy = RCMy + CLy;
+		else
+			CLy = rectcentrey + CLy;
+
+			return CLy;
+			return CLx;
+
+	}
+
+	int Equality() {
+		RCMx = rectcentrex;
+		RCMy = rectcentrey;
+
+		return RCMx;
+		return RCMy;
+	}
+
+	int GetrectcentreX() {
+		return rectcentrex;
+	}
+
+	int GetrectcentreY() {
+		return rectcentrey;
+	}
+
+	int GetRCMX() {
+		return RCMx;
+	}
+
+	int GetRCMY() {
+		return RCMy;
+	}
+
+	int GetCLX() {
+		return CLx;
+	}
+
+	int GetCLY() {
+		return CLy;
+	}
+
+	int Getdistance() {
+		return Distance;
+	}
+};
+
+Mat Rendering(Mat &frame, vector<vector<Point> > contours, int rectcentreX, int rectcentreY, int RCMX, int RCMY,
+	int distance, int CLX, int CLY, Rect &minRect, size_t i) {
+
+	rectangle(frame, minRect, Scalar(0, 0, 255));
+	circle(frame, Point(rectcentreX, rectcentreY), 1, (0, 0, 255), 3);
+	if (i > 0) {
+		line(frame, Point(RCMX, RCMY), Point(rectcentreX, rectcentreY), Scalar(0, 0, 255));
+		putText(frame, format("D = %d", distance), Point(CLX, CLY),
+			FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
+	}
+	putText(frame, format("width = %d , height = %d", minRect.width, minRect.height), Point(minRect.x, minRect.y),
+		FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
+
+	return frame;
+}
+
+int main(int argc, char** argv)
+{
+	VideoCapture cap(0);
+
+	vector<vector<Point> > contours;
+
+	Mat gray_image;
+	Mat edge;
+	Mat filter;
+	Mat frame;
+	Line line(0, 0, 0, 0, 0, 0, 0);
+
+	VideoWriter oVideoWriter("robot.avi", CV_FOURCC('F', 'L', 'V', '1'), 24, GetSize(cap));
+
+	Error1(cap, oVideoWriter);
 
 	while (true)
 	{
-		Mat frame;
-		Mat gray_image;
-		Mat edge;
-		Mat filter;
-		Mat size;
 
-		/*vector<Vec4i> lines;
-		int i = 0;*/
+		Error2(cap, frame);
 
-		bool bSuccess = cap.read(frame); // read a new frame from video
-
-		if (!bSuccess) //if not success, break loop
-		{
-			cout << "ERROR: Cannot read a frame from video file" << endl;
-			break;
-		}
-
-		cvtColor(frame, gray_image, COLOR_BGR2GRAY);
-		GaussianBlur(gray_image, filter, Size(7, 7), 1.5);
-		Canny(filter, edge, 50, 150, 3);
-		//HoughLinesP(edge, lines, 1, CV_PI / 180, 50, 10, 250);
-
-		//// нарисуем найденные линии
-		//for (size_t i = 0; i < lines.size(); i++) {
-		//	Vec4i l = lines[i];
-		//	line(frame, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(255, 0, 0), 3, LINE_AA);
-		//}
-
-		vector<vector<Point> > contours;
-		findContours(edge, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
+		findContours(Filter(frame, edge, filter, gray_image), contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
 
 		for (size_t i = 0; i < contours.size(); i++)
 		{
 			Rect minRect = boundingRect(contours[i]);
 
-			RCMX = rectcentreX;
-			RCMY = rectcentreY;
+			line.Equality();
 
 			if (minRect.width > 50 & minRect.height > 50 & minRect.width < 600 & minRect.height < 600)
 			{
-				rectcentreX = minRect.x + minRect.width / 2;
-				rectcentreY = minRect.y + minRect.height / 2;
-				int distance = norm(Point(RCMX, RCMY) - Point(rectcentreX, rectcentreY));
-				int CLX = abs((rectcentreX - RCMX) / 2);
-				if (rectcentreX > RCMX)
-					CLX = RCMX + CLX;
-				else
-					CLX = rectcentreX + CLX;
-				int CLY = abs((rectcentreY - RCMY) / 2);
-				if (rectcentreY > RCMY)
-					CLY = RCMY + CLY;
-				else
-					CLY = rectcentreY + CLY;
-				rectangle(frame, minRect, Scalar(0, 0, 255));
-				circle(frame, Point(rectcentreX, rectcentreY), 1, (0, 0, 255), 3);
-				if (i > 0) {
-					line(frame, Point(RCMX, RCMY), Point(rectcentreX, rectcentreY), Scalar(0, 0, 255));
-					putText(frame, format("D = %d", distance), Point(CLX, CLY),
-						FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
-				}
-				putText(frame, format("width = %d , height = %d", minRect.width, minRect.height), Point(minRect.x, minRect.y),
-					FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
-				/*cout << "width: " << minRect.width << " ";
-				cout << "height: " << minRect.height << "\n";*/
+				line.RectCentre(minRect);
+				line.Dist();
+				line.CentreLine();
+				Rendering(frame, contours, line.GetrectcentreX(), line.GetrectcentreY(), line.GetRCMX(), line.GetRCMY(), 
+					line.Getdistance(), line.GetCLX(), line.GetCLY(), minRect, i);
 			}
 
 
 		}
-			oVideoWriter.write(frame); //writer the frame into the file
+			oVideoWriter.write(frame); 
 		
 			imshow("Display", frame);
 
-			if (waitKey(1) == 27)
-			{
-				cout << "esc key is pressed by user" << endl;
-				break;
-			}
+			waitKey(1);
 	}
 }
