@@ -6,6 +6,7 @@
 #include <WS2tcpip.h>
 #include <stdio.h>
 #include <iostream>
+#include <iomanip>
 
 #pragma comment(lib, "Ws2_32.lib")
 #define default_buflen 1024
@@ -13,16 +14,6 @@
 
 using namespace std;
 using namespace cv;
-
-Size GetSize(VideoCapture &cap) {
-
-	double dWidth = cap.get(CV_CAP_PROP_FRAME_WIDTH);
-	double dHeight = cap.get(CV_CAP_PROP_FRAME_HEIGHT);
-
-	Size frameSize(static_cast<int>(dWidth), static_cast<int>(dHeight));
-
-	return frameSize;
-}
 
 Mat Filter(Mat &frame, Mat &edge, Mat &filter, Mat &gray_image) {
 
@@ -61,12 +52,14 @@ int Error2(VideoCapture& cap, Mat& frame) {
 }
 
 class Line {
+
 	int RCMx, RCMy, CLx, CLy, rectcentrey, rectcentrex, Distance;
+
 public:
 	Line(int RCMX, int RCMY, int CLX, int CLY, int rectcentreY, int rectcentreX, int distance) {
 
 		RCMx = RCMX;
-		RCMy = RCMY;
+		RCMy = RCMX;
 		CLx = CLX;
 		CLy = CLY;
 		rectcentrey = rectcentreY;
@@ -146,17 +139,60 @@ public:
 	}
 };
 
+class Area {
+	int SP, dWidth, dHeight;
+	double Rat, XM, YM, NM;
+public:
+	Area(double Xm, double Ym, double rat, int sp, int DWidth, int DHeight, double Nm) {
+
+		XM = Xm;
+		YM = Ym;
+		Rat = rat;
+		SP = sp;
+		dWidth = DWidth;
+		dHeight = DHeight;
+		NM = Nm;
+	}
+
+	void SetArea() {
+
+		cout << "Enter the size of the workspace (form: X_Y (Centimeters)): " << endl;
+		cin >> XM >> YM;
+	}
+
+	Size GetSize(VideoCapture& cap) {
+
+		dWidth = cap.get(CV_CAP_PROP_FRAME_WIDTH);
+		dHeight = cap.get(CV_CAP_PROP_FRAME_HEIGHT);
+
+		Size frameSize(static_cast<int>(dWidth), static_cast<int>(dHeight));
+
+		return frameSize;
+	}
+
+	void Ratio() {
+
+		Rat = (XM * YM) / (dWidth * dHeight);
+	}
+
+	double Transform(int N) {
+
+		NM = Rat * N;
+		return NM;
+	}
+};
+
 Mat Rendering(Mat &frame, vector<vector<Point> > contours, int rectcentreX, int rectcentreY, int RCMX, int RCMY,
-	int distance, int CLX, int CLY, Rect &minRect, size_t i) {
+	float distance, int CLX, int CLY, Rect &minRect, size_t i, float Rwidth, float Rheight) {
 
 	rectangle(frame, minRect, Scalar(0, 0, 255));
 	circle(frame, Point(rectcentreX, rectcentreY), 1, (0, 0, 255), 3);
 	if (i > 0) {
 		line(frame, Point(RCMX, RCMY), Point(rectcentreX, rectcentreY), Scalar(0, 0, 255));
-		putText(frame, format("D = %d", distance), Point(CLX, CLY),
+		putText(frame, format("D = %.3f Cm", distance), Point(CLX, CLY),
 			FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
 	}
-	putText(frame, format("width = %d , height = %d", minRect.width, minRect.height), Point(minRect.x, minRect.y),
+	putText(frame, format("W = %.3f Cm , H = %.3f Cm", Rwidth, Rheight), Point(minRect.x, minRect.y),
 		FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
 
 	return frame;
@@ -172,9 +208,15 @@ int main(int argc, char** argv)
 	Mat edge;
 	Mat filter;
 	Mat frame;
-	Line line(0, 0, 0, 0, 0, 0, 0);
 
-	VideoWriter oVideoWriter("robot.avi", CV_FOURCC('F', 'L', 'V', '1'), 24, GetSize(cap));
+	Line line(0, 0, 0, 0, 0, 0, 0);
+	Area area(0, 0, 0, 0, 0, 0, 0);
+
+	area.SetArea();
+
+	VideoWriter oVideoWriter("robot.avi", CV_FOURCC('F', 'L', 'V', '1'), 24, area.GetSize(cap));
+
+	area.Ratio();
 
 	Error1(cap, oVideoWriter);
 
@@ -197,7 +239,8 @@ int main(int argc, char** argv)
 				line.Dist();
 				line.CentreLine();
 				Rendering(frame, contours, line.GetrectcentreX(), line.GetrectcentreY(), line.GetRCMX(), line.GetRCMY(), 
-					line.Getdistance(), line.GetCLX(), line.GetCLY(), minRect, i);
+					area.Transform(line.Getdistance()), line.GetCLX(), 
+					line.GetCLY(), minRect, i, area.Transform(minRect.width), area.Transform(minRect.height));
 			}
 
 
