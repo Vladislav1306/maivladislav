@@ -24,48 +24,58 @@ Mat Filter(Mat &frame, Mat &edge, Mat &filter, Mat &gray_image) {
 	return edge;
 }
 
-int Error1(VideoCapture &cap, VideoWriter & oVideoWriter){
+void Error1(VideoCapture &cap, VideoWriter & oVideoWriter){
 
 	if (!cap.isOpened())
 	{
 		cout << "Cannot connect to camera" << endl;
 		getchar();
-		return -1;
+		return exit(1);
 	}
 
 	if (!oVideoWriter.isOpened())
 	{
 		cout << "ERROR: Failed to write the video" << endl;
-		return -1;
+		return exit(1);
 	}
 }
 
-int Error2(VideoCapture& cap, Mat& frame) {
+void Error2(VideoCapture& cap, Mat& frame) {
 
 	bool bSuccess = cap.read(frame);
 
 	if (!bSuccess)
 	{
 		cout << "ERROR: Cannot read a frame from video file" << endl;
-		return -1;
+		return exit(1);
 	}
 }
 
 class Line {
 
-	int RCMx, RCMy, CLx, CLy, rectcentrey, rectcentrex, Distance;
+	int MRecX[100] = { 0 };
+	int MRecY[100] = { 0 };
+	int CLx[100] = { 0 };
+	int CLy[100] = { 0 };
+	int rectcentrey, rectcentrex, Distance, k;
 
 public:
-	Line(int RCMX, int RCMY, int CLX, int CLY, int rectcentreY, int rectcentreX, int distance) {
+	Line(int rectcentreY, int rectcentreX, int distance, int K) {
 
-		RCMx = RCMX;
-		RCMy = RCMX;
-		CLx = CLX;
-		CLy = CLY;
 		rectcentrey = rectcentreY;
 		rectcentrex = rectcentreX;
 		Distance = distance;
+		k = K;
 
+	}
+
+	int Countk(int i) {
+
+		if (i < 20)
+			k = i;
+		else
+			k = i % 20;
+		return k;
 	}
 
 	int RectCentre(Rect &minRect) {
@@ -79,35 +89,40 @@ public:
 
 	int Dist() {
 
-		Distance = norm(Point(RCMx, RCMy) - Point(rectcentrex, rectcentrey));
+		Distance = norm(Point(MRecX[k], MRecY[k]) - Point(rectcentrex, rectcentrey));
 
 		return Distance;
 	}
 
 	int CentreLine() {
-
-		CLx = abs((rectcentrex - RCMx) / 2);
-		if (rectcentrex > RCMx)
-			CLx = RCMx + CLx;
-		else
-			CLx = rectcentrex + CLx;
-		CLy = abs((rectcentrey - RCMy) / 2);
-		if (rectcentrey > RCMy)
-			CLy = RCMy + CLy;
-		else
-			CLy = rectcentrey + CLy;
-
-			return CLy;
-			return CLx;
+		if (MRecX[k] != rectcentrex & MRecY[k] != rectcentrey) {
+			CLx[k] = abs((rectcentrex - MRecX[k]) / 2);
+			if (rectcentrex > MRecX[k])
+				CLx[k] = MRecX[k] + CLx[k];
+			else
+				CLx[k] = rectcentrex + CLx[k];
+			CLy[k] = abs((rectcentrey - MRecY[k]) / 2);
+			if (rectcentrey > MRecY[k])
+				CLy[k] = MRecY[k] + CLy[k];
+			else
+				CLy[k] = rectcentrey + CLy[k];
+		}
+			return CLy[k];
+			return CLx[k];
 
 	}
 
 	int Equality() {
-		RCMx = rectcentrex;
-		RCMy = rectcentrey;
 
-		return RCMx;
-		return RCMy;
+		for (int n = 0; n < k; ++n) {
+			if (rectcentrex != MRecX[n] & rectcentrey != MRecY[n]) {
+				MRecX[k] = rectcentrex;
+				MRecY[k] = rectcentrey;
+			}
+		}
+
+		return MRecX[k];
+		return MRecY[k];
 	}
 
 	int GetrectcentreX() {
@@ -118,24 +133,29 @@ public:
 		return rectcentrey;
 	}
 
-	int GetRCMX() {
-		return RCMx;
+	int *GetMRecX() {
+		return MRecX;
 	}
 
-	int GetRCMY() {
-		return RCMy;
+	int *GetMRecY() {
+		return MRecY;
 	}
 
-	int GetCLX() {
+	int *GetCLX() {
 		return CLx;
 	}
 
-	int GetCLY() {
+	int *GetCLY() {
 		return CLy;
 	}
 
 	int Getdistance() {
 		return Distance;
+	}
+
+	int Getk() {
+
+		return k;
 	}
 };
 
@@ -182,17 +202,23 @@ public:
 	}
 };
 
-Mat Rendering(Mat &frame, vector<vector<Point> > contours, int rectcentreX, int rectcentreY, int RCMX, int RCMY,
-	float distance, int CLX, int CLY, Rect &minRect, size_t i, float Rwidth, float Rheight) {
+Mat Rendering(Mat &frame, vector<vector<Point> > contours, int rectcentreX, int rectcentreY, int *MRecX, int *MRecY,
+	float distance, int *CLX, int *CLY, Rect &minRect, size_t i, float Rwidth, float Rheight, int k) {
 
 	rectangle(frame, minRect, Scalar(0, 0, 255));
 	circle(frame, Point(rectcentreX, rectcentreY), 1, (0, 0, 255), 3);
-	if (i > 0) {
-		line(frame, Point(RCMX, RCMY), Point(rectcentreX, rectcentreY), Scalar(0, 0, 255));
-		putText(frame, format("D = %.3f Cm", distance), Point(CLX, CLY),
-			FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
+	if (i > 0 & distance > 10) {
+		for (int z = 0; z < k; z++) {
+			if (MRecX[z] != 0 & MRecY[z] != 0) {
+				line(frame, Point(rectcentreX, rectcentreY), Point(MRecX[z], MRecY[z]), Scalar(0, 0, 255));
+				putText(frame, format("D = %.2f Cm", distance), Point(CLX[z], CLY[z]),
+					FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
+				/*if (distance < 50)
+					cout << "Warning! Next to the object!" << endl;*/
+			}
+		}
 	}
-	putText(frame, format("W = %.3f Cm , H = %.3f Cm", Rwidth, Rheight), Point(minRect.x, minRect.y),
+	putText(frame, format("W = %.2f Cm , H = %.2f Cm", Rwidth, Rheight), Point(minRect.x, minRect.y),
 		FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
 
 	return frame;
@@ -200,7 +226,8 @@ Mat Rendering(Mat &frame, vector<vector<Point> > contours, int rectcentreX, int 
 
 int main(int argc, char** argv)
 {
-	VideoCapture cap(0);
+	/*VideoCapture cap(0);*/
+	VideoCapture cap("Robot_without_shadows (1).mp4");
 
 	vector<vector<Point> > contours;
 
@@ -209,12 +236,12 @@ int main(int argc, char** argv)
 	Mat filter;
 	Mat frame;
 
-	Line line(0, 0, 0, 0, 0, 0, 0);
+	Line line(0, 0, 0, 0);
 	Area area(0, 0, 0, 0, 0, 0, 0);
 
 	area.SetArea();
 
-	VideoWriter oVideoWriter("robot.avi", CV_FOURCC('F', 'L', 'V', '1'), 24, area.GetSize(cap));
+	VideoWriter oVideoWriter("robot.avi", CV_FOURCC('F', 'L', 'V', '1'), 20, area.GetSize(cap));
 
 	area.Ratio();
 
@@ -231,16 +258,17 @@ int main(int argc, char** argv)
 		{
 			Rect minRect = boundingRect(contours[i]);
 
+			line.Countk(i);
 			line.Equality();
 
-			if (minRect.width > 50 & minRect.height > 50 & minRect.width < 600 & minRect.height < 600)
+			if (minRect.width > 10 & minRect.height > 10 & minRect.width < 400 & minRect.height < 400)
 			{
 				line.RectCentre(minRect);
 				line.Dist();
 				line.CentreLine();
-				Rendering(frame, contours, line.GetrectcentreX(), line.GetrectcentreY(), line.GetRCMX(), line.GetRCMY(), 
+				Rendering(frame, contours, line.GetrectcentreX(), line.GetrectcentreY(), line.GetMRecX(), line.GetMRecY(),
 					area.Transform(line.Getdistance()), line.GetCLX(), 
-					line.GetCLY(), minRect, i, area.Transform(minRect.width), area.Transform(minRect.height));
+					line.GetCLY(), minRect, i, area.Transform(minRect.width), area.Transform(minRect.height), line.Getk());
 			}
 
 
