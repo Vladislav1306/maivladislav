@@ -57,15 +57,16 @@ class Line {
 	int MRecY[100] = { 0 };
 	int CLx[100] = { 0 };
 	int CLy[100] = { 0 };
-	int rectcentrey, rectcentrex, Distance, k;
+	float Distance[100] = { 0 };
+	int rectcentrey, rectcentrex, k, d;
 
 public:
-	Line(int rectcentreY, int rectcentreX, int distance, int K) {
+	Line(int rectcentreY, int rectcentreX, int K, int D) {
 
 		rectcentrey = rectcentreY;
 		rectcentrex = rectcentreX;
-		Distance = distance;
 		k = K;
+		d = D;
 
 	}
 
@@ -75,6 +76,15 @@ public:
 			k = i;
 		else
 			k = i % 20;
+		return k;
+	}
+
+	int Countd(int i) {
+
+		if (i < 100)
+			k = i;
+		else
+			k = i % 100;
 		return k;
 	}
 
@@ -89,23 +99,26 @@ public:
 
 	int Dist() {
 
-		Distance = norm(Point(MRecX[k], MRecY[k]) - Point(rectcentrex, rectcentrey));
-
-		return Distance;
+		if (MRecX[k] != rectcentrex & MRecY[k] != rectcentrey & MRecX[k] != 0 & MRecY[k] != 0) {
+			Distance[k] = norm(Point(MRecX[k], MRecY[k]) - Point(rectcentrex, rectcentrey));
+		}
+		return Distance[k];
 	}
 
 	int CentreLine() {
-		if (MRecX[k] != rectcentrex & MRecY[k] != rectcentrey) {
-			CLx[k] = abs((rectcentrex - MRecX[k]) / 2);
-			if (rectcentrex > MRecX[k])
-				CLx[k] = MRecX[k] + CLx[k];
-			else
-				CLx[k] = rectcentrex + CLx[k];
-			CLy[k] = abs((rectcentrey - MRecY[k]) / 2);
-			if (rectcentrey > MRecY[k])
-				CLy[k] = MRecY[k] + CLy[k];
-			else
-				CLy[k] = rectcentrey + CLy[k];
+		for (int i = 0; i < k; i++) {
+			if (MRecX[i] != rectcentrex & MRecY[i] != rectcentrey & MRecX[k] != 0 & MRecY[k] != 0) {
+				CLx[i] = abs((rectcentrex - MRecX[i]) / 2);
+				if (rectcentrex > MRecX[i])
+					CLx[i] = MRecX[i] + CLx[i];
+				else
+					CLx[i] = rectcentrex + CLx[i];
+				CLy[i] = abs((rectcentrey - MRecY[i]) / 2);
+				if (rectcentrey > MRecY[i])
+					CLy[i] = MRecY[i] + CLy[i];
+				else
+					CLy[i] = rectcentrey + CLy[i];
+			}
 		}
 			return CLy[k];
 			return CLx[k];
@@ -114,11 +127,10 @@ public:
 
 	int Equality() {
 
-		for (int n = 0; n < k; ++n) {
-			if (rectcentrex != MRecX[n] & rectcentrey != MRecY[n]) {
-				MRecX[k] = rectcentrex;
-				MRecY[k] = rectcentrey;
-			}
+
+		if (rectcentrex != MRecX[k] & rectcentrey != MRecY[k]) {
+			MRecX[k] = rectcentrex;
+			MRecY[k] = rectcentrey;
 		}
 
 		return MRecX[k];
@@ -149,7 +161,7 @@ public:
 		return CLy;
 	}
 
-	int Getdistance() {
+	float *Getdistance() {
 		return Distance;
 	}
 
@@ -161,9 +173,10 @@ public:
 
 class Area {
 	int SP, dWidth, dHeight;
-	double Rat, XM, YM, NM;
+	double Rat, XM, YM, NM2;
+	float NM[100] = { 0 };
 public:
-	Area(double Xm, double Ym, double rat, int sp, int DWidth, int DHeight, double Nm) {
+	Area(double Xm, double Ym, double rat, int sp, int DWidth, int DHeight, double Nm2) {
 
 		XM = Xm;
 		YM = Ym;
@@ -171,7 +184,7 @@ public:
 		SP = sp;
 		dWidth = DWidth;
 		dHeight = DHeight;
-		NM = Nm;
+		NM2 = Nm2;
 	}
 
 	void SetArea() {
@@ -195,29 +208,41 @@ public:
 		Rat = (XM * YM) / (dWidth * dHeight);
 	}
 
-	double Transform(int N) {
+	float *TransformM(float* N, int k) {
 
-		NM = Rat * N;
+		NM[k] = Rat * N[k];
 		return NM;
+	}
+
+	float *GetNM() {
+
+		return NM;
+	}
+
+	float Transform(float N) {
+
+		NM2 = Rat * N;
+		return NM2;
 	}
 };
 
-Mat Rendering(Mat &frame, vector<vector<Point> > contours, int rectcentreX, int rectcentreY, int *MRecX, int *MRecY,
-	float distance, int *CLX, int *CLY, Rect &minRect, size_t i, float Rwidth, float Rheight, int k) {
+Mat Rendering(Mat& frame, vector<vector<Point> > contours, int rectcentreX, int rectcentreY, int* MRecX, int* MRecY,
+	float* distance, int* CLX, int* CLY, Rect& minRect, size_t i, float Rwidth, float Rheight, int k) {
 
 	rectangle(frame, minRect, Scalar(0, 0, 255));
 	circle(frame, Point(rectcentreX, rectcentreY), 1, (0, 0, 255), 3);
-	if (i > 0 & distance > 10) {
+
 		for (int z = 0; z < k; z++) {
-			if (MRecX[z] != 0 & MRecY[z] != 0) {
+			if ((MRecX[z] > (rectcentreX + 5) || MRecX[z] < (rectcentreX - 5) & MRecY[z] > (rectcentreY + 5) || MRecY[z] < (rectcentreY - 5))
+				& MRecX[z] != 0 & MRecY[z] != 0 & distance[z] != 0 & CLX[z] != 0 & CLY[z] != 0) {
 				line(frame, Point(rectcentreX, rectcentreY), Point(MRecX[z], MRecY[z]), Scalar(0, 0, 255));
-				putText(frame, format("D = %.2f Cm", distance), Point(CLX[z], CLY[z]),
+				putText(frame, format("D = %.2f Cm", (distance[z])), Point(CLX[z], CLY[z]),
 					FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
 				/*if (distance < 50)
 					cout << "Warning! Next to the object!" << endl;*/
 			}
 		}
-	}
+
 	putText(frame, format("W = %.2f Cm , H = %.2f Cm", Rwidth, Rheight), Point(minRect.x, minRect.y),
 		FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
 
@@ -241,7 +266,7 @@ int main(int argc, char** argv)
 
 	area.SetArea();
 
-	VideoWriter oVideoWriter("robot.avi", CV_FOURCC('F', 'L', 'V', '1'), 20, area.GetSize(cap));
+	VideoWriter oVideoWriter("robot.avi", CV_FOURCC('F', 'L', 'V', '1'), 1, area.GetSize(cap));
 
 	area.Ratio();
 
@@ -259,15 +284,17 @@ int main(int argc, char** argv)
 			Rect minRect = boundingRect(contours[i]);
 
 			line.Countk(i);
-			line.Equality();
+			line.Countd(i);
 
 			if (minRect.width > 10 & minRect.height > 10 & minRect.width < 400 & minRect.height < 400)
 			{
+				line.Equality();
 				line.RectCentre(minRect);
 				line.Dist();
 				line.CentreLine();
+				area.TransformM(line.Getdistance(), line.Getk());
 				Rendering(frame, contours, line.GetrectcentreX(), line.GetrectcentreY(), line.GetMRecX(), line.GetMRecY(),
-					area.Transform(line.Getdistance()), line.GetCLX(), 
+					area.GetNM(), line.GetCLX(), 
 					line.GetCLY(), minRect, i, area.Transform(minRect.width), area.Transform(minRect.height), line.Getk());
 			}
 
@@ -277,6 +304,6 @@ int main(int argc, char** argv)
 		
 			imshow("Display", frame);
 
-			waitKey(1);
+			waitKey(250);
 	}
 }
