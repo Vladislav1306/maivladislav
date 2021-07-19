@@ -1,3 +1,4 @@
+
 #include<opencv2/opencv.hpp>
 #include <opencv\cv.h>
 #include <opencv2\highgui\highgui.hpp>
@@ -58,33 +59,20 @@ class Line {
 	int CLx[100] = { 0 };
 	int CLy[100] = { 0 };
 	float Distance[100] = { 0 };
-	int rectcentrey, rectcentrex, k, d;
+	int rectcentrey, rectcentrex, k;
 
 public:
-	Line(int rectcentreY, int rectcentreX, int K, int D) {
+	Line(int rectcentreY, int rectcentreX, int K) {
 
 		rectcentrey = rectcentreY;
 		rectcentrex = rectcentreX;
 		k = K;
-		d = D;
 
 	}
 
-	int Countk(int i) {
+	int KI(int i) {
+		k = i;
 
-		if (i < 20)
-			k = i;
-		else
-			k = i % 20;
-		return k;
-	}
-
-	int Countd(int i) {
-
-		if (i < 100)
-			k = i;
-		else
-			k = i % 100;
 		return k;
 	}
 
@@ -97,29 +85,28 @@ public:
 		return rectcentrex;
 	}
 
-	int Dist() {
+	float Dist() {
 
-		if (MRecX[k] != rectcentrex & MRecY[k] != rectcentrey & MRecX[k] != 0 & MRecY[k] != 0) {
-			Distance[k] = norm(Point(MRecX[k], MRecY[k]) - Point(rectcentrex, rectcentrey));
-		}
+			if (MRecX[k] != rectcentrex & MRecY[k] != rectcentrey)
+				Distance[k] = norm(Point(MRecX[k], MRecY[k]) - Point(rectcentrex, rectcentrey));
+
 		return Distance[k];
 	}
 
 	int CentreLine() {
-		for (int i = 0; i < k; i++) {
-			if (MRecX[i] != rectcentrex & MRecY[i] != rectcentrey & MRecX[k] != 0 & MRecY[k] != 0) {
-				CLx[i] = abs((rectcentrex - MRecX[i]) / 2);
-				if (rectcentrex > MRecX[i])
-					CLx[i] = MRecX[i] + CLx[i];
+			if (MRecX[k] != rectcentrex & MRecY[k] != rectcentrey) {
+				CLx[k] = abs((rectcentrex - MRecX[k]) / 2);
+				if (rectcentrex > MRecX[k])
+					CLx[k] = MRecX[k] + CLx[k];
 				else
-					CLx[i] = rectcentrex + CLx[i];
-				CLy[i] = abs((rectcentrey - MRecY[i]) / 2);
-				if (rectcentrey > MRecY[i])
-					CLy[i] = MRecY[i] + CLy[i];
+					CLx[k] = rectcentrex + CLx[k];
+				CLy[k] = abs((rectcentrey - MRecY[k]) / 2);
+				if (rectcentrey > MRecY[k])
+					CLy[k] = MRecY[k] + CLy[k];
 				else
-					CLy[i] = rectcentrey + CLy[i];
+					CLy[k] = rectcentrey + CLy[k];
 			}
-		}
+
 			return CLy[k];
 			return CLx[k];
 
@@ -149,8 +136,18 @@ public:
 		return MRecX;
 	}
 
+	int GetMRecXX(int i) {
+
+		return MRecX[i];
+	}
+
 	int *GetMRecY() {
 		return MRecY;
+	}
+
+	int GetMRecYY(int i) {
+
+		return MRecY[i];
 	}
 
 	int *GetCLX() {
@@ -165,9 +162,22 @@ public:
 		return Distance;
 	}
 
+	float Getdistance1(int i) {
+		return Distance[i];
+	}
+
 	int Getk() {
 
 		return k;
+	}
+
+	void Null() {
+
+		memset(MRecX, 0, 100);
+		memset(MRecY, 0, 100);
+		memset(CLx, 0, 100);
+		memset(CLy, 0, 100);
+		memset(Distance, 0, 100);
 	}
 };
 
@@ -227,21 +237,19 @@ public:
 };
 
 Mat Rendering(Mat& frame, vector<vector<Point> > contours, int rectcentreX, int rectcentreY, int* MRecX, int* MRecY,
-	float* distance, int* CLX, int* CLY, Rect& minRect, size_t i, float Rwidth, float Rheight, int k) {
+	float* distance, int* CLX, int* CLY, Rect& minRect, float Rwidth, float Rheight, int k) {
 
 	rectangle(frame, minRect, Scalar(0, 0, 255));
 	circle(frame, Point(rectcentreX, rectcentreY), 1, (0, 0, 255), 3);
+	if (MRecX[k] != 0 & MRecY[k] != 0) {
+				line(frame, Point(rectcentreX, rectcentreY), Point(MRecX[k], MRecY[k]), Scalar(255, 0, 0));
+				putText(frame, format("D = %.2f Cm", (distance[k])), Point(CLX[k], CLY[k]),
+					FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
+				cout << "Distance" << k << " " << distance[k] << endl;
+	}
 
-		for (int z = 0; z < k; z++) {
-			if ((MRecX[z] > (rectcentreX + 5) || MRecX[z] < (rectcentreX - 5) & MRecY[z] > (rectcentreY + 5) || MRecY[z] < (rectcentreY - 5))
-				& MRecX[z] != 0 & MRecY[z] != 0 & distance[z] != 0 & CLX[z] != 0 & CLY[z] != 0) {
-				line(frame, Point(rectcentreX, rectcentreY), Point(MRecX[z], MRecY[z]), Scalar(0, 0, 255));
-				putText(frame, format("D = %.2f Cm", (distance[z])), Point(CLX[z], CLY[z]),
-					FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
-				/*if (distance < 50)
-					cout << "Warning! Next to the object!" << endl;*/
-			}
-		}
+	/*if (distance < 50)
+		cout << "Warning! Next to the object!" << endl;*/
 
 	putText(frame, format("W = %.2f Cm , H = %.2f Cm", Rwidth, Rheight), Point(minRect.x, minRect.y),
 		FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
@@ -261,7 +269,7 @@ int main(int argc, char** argv)
 	Mat filter;
 	Mat frame;
 
-	Line line(0, 0, 0, 0);
+	Line line1(0, 0, 0);
 	Area area(0, 0, 0, 0, 0, 0, 0);
 
 	area.SetArea();
@@ -282,28 +290,29 @@ int main(int argc, char** argv)
 		for (size_t i = 0; i < contours.size(); i++)
 		{
 			Rect minRect = boundingRect(contours[i]);
-
-			line.Countk(i);
-			line.Countd(i);
+			line1.KI(i);
 
 			if (minRect.width > 10 & minRect.height > 10 & minRect.width < 400 & minRect.height < 400)
 			{
-				line.Equality();
-				line.RectCentre(minRect);
-				line.Dist();
-				line.CentreLine();
-				area.TransformM(line.Getdistance(), line.Getk());
-				Rendering(frame, contours, line.GetrectcentreX(), line.GetrectcentreY(), line.GetMRecX(), line.GetMRecY(),
-					area.GetNM(), line.GetCLX(), 
-					line.GetCLY(), minRect, i, area.Transform(minRect.width), area.Transform(minRect.height), line.Getk());
+				line1.Equality();
+				line1.RectCentre(minRect);
+				line1.CentreLine();
+				line1.Dist();
+				area.TransformM(line1.Getdistance(), line1.Getk());
+				Rendering(frame, contours, line1.GetrectcentreX(), line1.GetrectcentreY(), line1.GetMRecX(), line1.GetMRecY(),
+					area.GetNM(), line1.GetCLX(),
+					line1.GetCLY(), minRect, area.Transform(minRect.width), area.Transform(minRect.height), line1.Getk());
 			}
 
 
 		}
-			oVideoWriter.write(frame); 
-		
-			imshow("Display", frame);
+		oVideoWriter.write(frame);
 
-			waitKey(250);
+		imshow("Display", frame);
+
+		waitKey(500);
+
+		line1.Null();
+
 	}
 }
