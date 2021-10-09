@@ -1,0 +1,78 @@
+#include "pch.h"
+#include <iostream>
+#include <vector>
+#include <string>
+#include <windows.h>
+using namespace std;
+
+string ksT;
+string kZ;
+string giT;
+
+struct messagest{
+
+	string kst;
+	string kz;
+	string git;
+
+};
+
+class VectorTest : public testing::Test {
+public:
+
+	vector<string> vectorM;
+
+	virtual void SetUp() {
+
+		vectorM.push_back("4");
+		vectorM.push_back("5");
+		vectorM.push_back("github.com");
+
+	}
+	virtual void TearDown()
+	{
+	}
+
+};
+
+//void Enter() {
+//
+//	cout << "Enter the student's code_the assignment code_the link to the git assignment" << endl;
+//	cin >> ksT >> kZ >> giT;
+//
+//}
+
+//string Def(string kst, string kz, string git) {
+//
+//	kst = ksT;
+//	kz = kZ;
+//	git = giT;
+//
+//	return kst;
+//	return kz;
+//	return git;
+//}
+
+TEST_F(VectorTest, Testel1) {
+
+	EXPECT_EQ("5", vectorM[0]);
+}
+
+TEST_F(VectorTest, Testel2) {
+
+	EXPECT_EQ("5", vectorM[1]);
+}
+
+TEST_F(VectorTest, Testelg) {
+
+	EXPECT_EQ( "github.com" , vectorM[2]);
+}
+
+int main(int argc, char** argv) {
+
+	messagest M;
+
+	testing::InitGoogleTest(&argc, argv);
+	return RUN_ALL_TESTS();
+
+}
