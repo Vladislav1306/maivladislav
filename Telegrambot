@@ -1,0 +1,41 @@
+import telebot;
+import sqlite3;
+from telebot import types;
+
+conn = sqlite3.connect('DataBase1.db', check_same_thread=False);
+cursor = conn.cursor();
+
+bot = telebot.TeleBot('2012687140:AAEKlVEnkj-q77BFM1XrqtlcInJxbiMmPM8');
+
+@bot.message_handler(commands=['start'])
+def start_message(message):
+
+	bot.send_message(message.chat.id, 'Добро пожаловать, введите ваш персональный код.')
+
+op_git = 0
+
+@bot.message_handler(content_types=['text'])
+def authorization(message):
+
+	if message.text.isdigit() == True :
+		if int(message.text) >= 1 and int(message.text) <= 3 :
+			for row in cursor.execute(f"SELECT Task FROM Univer WHERE Number = {message.text}"):
+				bot.send_message(message.chat.id, f'Твое задание: {row[0]}.')
+			for row in cursor.execute(f"SELECT Option FROM Univer WHERE Number = {message.text}"):
+				bot.send_message(message.chat.id, f'Твой вариант задания: {row[0]}.')
+				global op_git
+				op_git = row[0];
+			bot.send_message(message.chat.id, 'Если ты хочешь сдать задние, то отправь боту ссылку на свой репозиторий git.')
+			bot.register_next_step_handler(message, sub_task);
+		else: bot.send_message(message.chat.id, 'Ввод некоректный.')
+	else: bot.send_message(message.chat.id, 'Ввод некоректный.')
+def sub_task(message):
+
+	git = message.text;
+	sql_update_query = """UPDATE Univer SET Git = ? WHERE Option = ?"""
+	data = (git, op_git)
+	cursor.execute(sql_update_query, data)
+	conn.commit()
+	bot.send_message(message.chat.id, 'Получил, жди оценку от преподавателя.')
+
+bot.polling(none_stop=True, interval=0)
