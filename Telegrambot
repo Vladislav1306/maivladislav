@@ -5,8 +5,6 @@ from telebot import types;
 conn = sqlite3.connect('DataBase1.db', check_same_thread=False);
 cursor = conn.cursor();
 
-bot = telebot.TeleBot('2012687140:AAEKlVEnkj-q77BFM1XrqtlcInJxbiMmPM8');
-
 @bot.message_handler(commands=['start'])
 def start_message(message):
 
